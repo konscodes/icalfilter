@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>iCalFilter</title>
+<meta name="description" content="Filter and rewrite events from any iCalendar feed and get a new subscribable URL.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239333ea' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='18' rx='2'/><path d='M16 2v4M8 2v4M3 10h18'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff;
+    --tint: #f6f0ff;
+    --text: #1e293b;
+    --heading: #334155;
+    --muted: #64748b;
+    --border: #cbd5e1;
+    --border-soft: #e2e8f0;
+    --input-bg: #ffffff;
+    --accent: #a855f7;
+    --accent-strong: #9333ea;
+    --accent-soft: #f3e8ff;
+    --danger: #a855f7;
+    --ok: #15803d;
+    --ok-soft: #dcfce7;
+    --off: #94a3b8;
+    --off-soft: #f1f5f9;
+    --error: #b91c1c;
+    --error-soft: #fef2f2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --tint: #1a1426;
+      --text: #e2e8f0;
+      --heading: #e2e8f0;
+      --muted: #94a3b8;
+      --border: #334155;
+      --border-soft: #1e293b;
+      --input-bg: #161a21;
+      --accent: #a855f7;
+      --accent-strong: #c084fc;
+      --accent-soft: #2a1f3d;
+      --ok: #4ade80;
+      --ok-soft: #14291c;
+      --off: #64748b;
+      --off-soft: #1a1f27;
+      --error: #fca5a5;
+      --error-soft: #2a1515;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+    color: var(--text);
+    background: radial-gradient(1200px 300px at 0 0, var(--tint), transparent 70%) var(--bg);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font-size: 2rem; font-weight: 800; color: var(--heading); margin: 0 0 6px; letter-spacing: -0.01em; }
+  .lede { color: var(--muted); margin: 0 0 18px; line-height: 1.5; }
+  hr { border: 0; border-top: 1px solid var(--border-soft); margin: 0 0 24px; }
+  label, .label { display: block; font-weight: 600; color: var(--heading); margin: 22px 0 8px; font-size: 0.95rem; }
+  .hint { color: var(--muted); font-size: 0.9rem; margin-top: 6px; }
+  .field { position: relative; }
+  .field svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--off); pointer-events: none; }
+  input, select {
+    font: inherit; color: var(--text); background: var(--input-bg);
+    border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; width: 100%; min-width: 0;
+  }
+  .field input { padding-left: 34px; }
+  input::placeholder { color: var(--off); }
+  input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  .rule { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .rule select { width: auto; flex: 0 0 auto; }
+  .rule input[type=text] { flex: 1 1 160px; }
+  .rule .word { color: var(--muted); font-size: 0.9rem; }
+  .rule .check { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 0.9rem; white-space: nowrap; }
+  .rule .check input { width: auto; }
+  .rule-help { color: var(--muted); font-size: 0.85rem; margin: 0 0 8px; }
+  button { font: inherit; cursor: pointer; border: 0; border-radius: 4px; display: inline-flex; align-items: center; gap: 8px; }
+  button svg { width: 16px; height: 16px; }
+  .add { background: none; color: var(--heading); font-weight: 600; font-size: 0.9rem; padding: 6px 10px; }
+  .add:hover { background: var(--accent-soft); }
+  .x { background: none; color: var(--off); padding: 6px; }
+  .x:hover { color: var(--error); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 30px; }
+  .primary { background: var(--accent); color: #fff; font-weight: 600; padding: 8px 12px; }
+  .primary:hover { background: #9333ea; }
+  .soft { background: var(--accent-soft); color: var(--accent-strong); font-weight: 600; padding: 8px 12px; }
+  .ghost { background: none; color: var(--accent-strong); font-weight: 600; padding: 8px 12px; }
+  .soft:disabled { opacity: 0.5; cursor: default; }
+  .ghost:hover, .soft:not(:disabled):hover { background: var(--accent-soft); filter: brightness(0.97); }
+  .result { margin-top: 20px; padding: 14px; border: 1px solid var(--border-soft); border-radius: 8px; background: var(--input-bg); }
+  .result code { display: block; word-break: break-all; font-size: 0.82rem; color: var(--text); }
+  .result .links { margin-top: 10px; display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.9rem; }
+  a { color: var(--accent-strong); }
+  .preview-head { display: flex; justify-content: space-between; align-items: baseline; margin: 40px 0 10px; gap: 12px; }
+  .preview-head h2 { font-size: 1.15rem; margin: 0; color: var(--heading); }
+  .count { color: var(--muted); font-size: 0.9rem; }
+  .events { list-style: none; padding: 0; margin: 0; border: 1px solid var(--border-soft); border-radius: 8px; overflow: hidden; }
+  .events li { display: grid; grid-template-columns: 150px 1fr auto; gap: 12px; padding: 9px 12px; border-top: 1px solid var(--border-soft); align-items: baseline; font-size: 0.92rem; }
+  .events li:first-child { border-top: 0; }
+  .events .when { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .events .orig { display: block; color: var(--off); text-decoration: line-through; font-size: 0.82rem; }
+  .events .tag { font-size: 0.75rem; font-weight: 600; padding: 2px 7px; border-radius: 99px; background: var(--ok-soft); color: var(--ok); }
+  .events li.off { background: var(--off-soft); }
+  .events li.off .what { color: var(--off); text-decoration: line-through; }
+  .events li.off .tag { background: transparent; color: var(--off); border: 1px solid var(--border); }
+  .msg { padding: 12px; border-radius: 8px; color: var(--muted); border: 1px dashed var(--border); font-size: 0.92rem; }
+  .msg.err { color: var(--error); background: var(--error-soft); border-color: transparent; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--heading); color: var(--bg); padding: 8px 14px; border-radius: 6px; font-size: 0.9rem; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  @media (max-width: 560px) {
+    .events li { grid-template-columns: 1fr auto; }
+    .events .when { grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Create a calendar</h1>
+  <p class="lede">Paste an iCalendar URL and add rules. You get a new URL with your settings encoded in it — subscribe to it in any calendar app and it stays up to date with the original.</p>
+  <hr>
+
+  <label for="name">Calendar name</label>
+  <div class="field">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+    <input id="name" type="text" placeholder="Give your calendar a name…" autocomplete="off">
+  </div>
+
+  <label for="url">iCalendar URL</label>
+  <div class="field">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+    <input id="url" type="url" placeholder="Enter your iCalendar URL…" autocomplete="off">
+  </div>
+  <div class="hint">An https:// or webcal:// feed. Paste a link generated here to edit it.</div>
+
+  <label for="tz">Fallback timezone</label>
+  <div class="field">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20"/></svg>
+    <input id="tz" type="text" list="tzlist" autocomplete="off">
+    <datalist id="tzlist"></datalist>
+  </div>
+  <div class="hint">Used only when the source calendar does not provide timezone metadata.</div>
+
+  <div class="label">Filtering rules</div>
+  <p class="rule-help" id="filterHelp" hidden>Events matching any <b>Remove</b> rule are dropped. If you add <b>Keep</b> rules, only events matching at least one of them are kept. Matching ignores case.</p>
+  <div id="filters"></div>
+  <button class="add" id="addFilter" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add rule
+  </button>
+
+  <div class="label">Replacement rules</div>
+  <div id="replaces"></div>
+  <button class="add" id="addReplace" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add replace
+  </button>
+
+  <div class="actions">
+    <button class="primary" id="save" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Save calendar
+    </button>
+    <button class="soft" id="copy" type="button" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>Copy calendar link
+    </button>
+    <button class="ghost" id="reset" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>Delete calendar
+    </button>
+  </div>
+
+  <div class="result" id="result" hidden>
+    <code id="feedUrl"></code>
+    <div class="links">
+      <a id="webcal" href="#">Open in Apple Calendar / Outlook</a>
+      <a id="gcal" href="#" target="_blank" rel="noopener">Add to Google Calendar</a>
+    </div>
+  </div>
+
+  <div class="preview-head">
+    <h2>Preview</h2>
+    <span class="count" id="count"></span>
+  </div>
+  <div id="preview"><div class="msg">Enter an iCalendar URL to see its events.</div></div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const STORE = 'icalfilter:last';
+const FIELD_OPTS = [['summary', 'Title'], ['description', 'Description'], ['location', 'Location'], ['any', 'Any field']];
+const OP_OPTS = [['contains', 'contains'], ['equals', 'equals'], ['starts', 'starts with'], ['regex', 'matches regex']];
+const defaultTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+// ---- encoding ----
+const toB64url = (s) => {
+  let bin = '';
+  for (const b of new TextEncoder().encode(s)) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+const fromB64url = (s) =>
+  new TextDecoder().decode(Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)));
+
+// ---- form ----
+const opts = (list, val) => list.map(([v, t]) => `<option value="${v}"${v === val ? ' selected' : ''}>${t}</option>`).join('');
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const X_BTN = `<button class="x" type="button" title="Remove rule" aria-label="Remove rule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>`;
+
+function addFilter(r = {}) {
+  const row = document.createElement('div');
+  row.className = 'rule';
+  row.dataset.kind = 'filter';
+  row.innerHTML = `
+    <select data-k="mode" aria-label="Action">${opts([['remove', 'Remove'], ['keep', 'Keep']], r.mode || 'remove')}</select>
+    <span class="word">events where</span>
+    <select data-k="field" aria-label="Field">${opts(FIELD_OPTS, r.field || 'summary')}</select>
+    <select data-k="op" aria-label="Condition">${opts(OP_OPTS, r.op || 'contains')}</select>
+    <input data-k="value" type="text" placeholder="text…" value="${esc(r.value)}" aria-label="Value">
+    ${X_BTN}`;
+  $('filters').append(row);
+  $('filterHelp').hidden = false;
+  return row;
+}
+
+function addReplace(r = {}) {
+  const row = document.createElement('div');
+  row.className = 'rule';
+  row.dataset.kind = 'replace';
+  row.innerHTML = `
+    <span class="word">In</span>
+    <select data-k="field" aria-label="Field">${opts(FIELD_OPTS, r.field || 'summary')}</select>
+    <span class="word">replace</span>
+    <input data-k="find" type="text" placeholder="find…" value="${esc(r.find)}" aria-label="Find">
+    <span class="word">with</span>
+    <input data-k="replace" type="text" placeholder="(nothing)" value="${esc(r.replace)}" aria-label="Replace with">
+    <label class="check"><input data-k="regex" type="checkbox"${r.regex ? ' checked' : ''}> regex</label>
+    ${X_BTN}`;
+  $('replaces').append(row);
+  return row;
+}
+
+function readRows(container) {
+  return [...container.querySelectorAll('.rule')].map((row) => {
+    const o = {};
+    row.querySelectorAll('[data-k]').forEach((el) => (o[el.dataset.k] = el.type === 'checkbox' ? el.checked : el.value));
+    return o;
+  });
+}
+
+function collect() {
+  return {
+    name: $('name').value.trim(),
+    url: $('url').value.trim(),
+    tz: $('tz').value.trim(),
+    filters: readRows($('filters')),
+    replaces: readRows($('replaces')),
+  };
+}
+
+function load(cfg) {
+  $('name').value = cfg.name || '';
+  $('url').value = cfg.url || '';
+  $('tz').value = cfg.tz || defaultTz;
+  $('filters').innerHTML = '';
+  $('replaces').innerHTML = '';
+  (cfg.filters || []).forEach(addFilter);
+  (cfg.replaces || []).forEach(addReplace);
+  $('filterHelp').hidden = !(cfg.filters || []).length;
+}
+
+const encoded = () => toB64url(JSON.stringify(collect()));
+const feedUrl = () => `${location.origin}/api/feed?c=${encoded()}`;
+
+// ---- UI actions ----
+function toast(text) {
+  const t = $('toast');
+  t.textContent = text;
+  t.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+function showLink() {
+  const url = feedUrl();
+  const webcal = url.replace(/^https?:/, 'webcal:');
+  $('feedUrl').textContent = url;
+  $('webcal').href = webcal;
+  $('gcal').href = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`;
+  $('result').hidden = false;
+  $('copy').disabled = false;
+}
+
+function save() {
+  if (!$('url').value.trim()) {
+    toast('Enter an iCalendar URL first');
+    $('url').focus();
+    return;
+  }
+  const c = encoded();
+  history.replaceState(null, '', `#${c}`);
+  try { localStorage.setItem(STORE, c); } catch {}
+  showLink();
+  refreshPreview();
+  toast('Calendar saved — link below');
+}
+
+async function copy() {
+  const url = feedUrl();
+  try {
+    await navigator.clipboard.writeText(url);
+    toast('Link copied');
+  } catch {
+    prompt('Copy this link:', url);
+  }
+}
+
+function reset() {
+  if (!confirm('Clear this calendar and all its rules?')) return;
+  try { localStorage.removeItem(STORE); } catch {}
+  history.replaceState(null, '', location.pathname);
+  load({});
+  $('result').hidden = true;
+  $('copy').disabled = true;
+  refreshPreview();
+}
+
+// ---- preview ----
+function fmtDate(v) {
+  const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/.exec(v || '');
+  if (!m) return v || '';
+  const [, y, mo, d, h, mi, s, z] = m;
+  if (!h) return new Date(+y, mo - 1, +d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  const date = z ? new Date(Date.UTC(+y, mo - 1, +d, +h, +mi, +s)) : new Date(+y, mo - 1, +d, +h, +mi, +s);
+  return date.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+let previewSeq = 0;
+async function refreshPreview() {
+  const box = $('preview');
+  const seq = ++previewSeq;
+  if (!$('url').value.trim()) {
+    box.innerHTML = '<div class="msg">Enter an iCalendar URL to see its events.</div>';
+    $('count').textContent = '';
+    return;
+  }
+  $('count').textContent = 'Loading…';
+  try {
+    const res = await fetch(`/api/feed?format=json&c=${encoded()}`);
+    const data = await res.json();
+    if (seq !== previewSeq) return;
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    $('count').textContent = `${data.kept} of ${data.total} events kept`;
+    if (!data.events.length) {
+      box.innerHTML = '<div class="msg">The source calendar has no events.</div>';
+      return;
+    }
+    const sorted = [...data.events].sort((a, b) => (a.start > b.start ? 1 : -1));
+    box.innerHTML = `<ul class="events">${sorted
+      .map(
+        (e) => `<li class="${e.kept ? '' : 'off'}">
+          <span class="when">${esc(fmtDate(e.start))}</span>
+          <span class="what">${esc(e.summary) || '<em>(no title)</em>'}${
+            e.kept && e.original !== e.summary ? `<span class="orig">${esc(e.original)}</span>` : ''
+          }</span>
+          <span class="tag">${e.kept ? 'Kept' : 'Removed'}</span>
+        </li>`,
+      )
+      .join('')}</ul>`;
+  } catch (err) {
+    if (seq !== previewSeq) return;
+    $('count').textContent = '';
+    box.innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
+  }
+}
+
+let debounce;
+function changed() {
+  clearTimeout(debounce);
+  debounce = setTimeout(() => {
+    if (!$('result').hidden) showLink();
+    refreshPreview();
+  }, 600);
+}
+
+// Pasting a link generated by this app into the URL field loads its settings.
+function maybeImport() {
+  const v = $('url').value.trim();
+  const m = /\/api\/feed\?(?:.*&)?c=([A-Za-z0-9_-]+)/.exec(v);
+  if (!m) return false;
+  try {
+    load(JSON.parse(fromB64url(m[1])));
+    toast('Loaded settings from link');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ---- wiring ----
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'url') maybeImport();
+  if (e.target.closest('main')) changed();
+});
+document.addEventListener('change', (e) => e.target.closest('main') && changed());
+document.addEventListener('click', (e) => {
+  const x = e.target.closest('.x');
+  if (x) {
+    x.closest('.rule').remove();
+    $('filterHelp').hidden = !$('filters').children.length;
+    changed();
+  }
+});
+$('addFilter').onclick = () => addFilter().querySelector('input').focus();
+$('addReplace').onclick = () => addReplace().querySelector('input').focus();
+$('save').onclick = save;
+$('copy').onclick = copy;
+$('reset').onclick = reset;
+
+try {
+  $('tzlist').innerHTML = Intl.supportedValuesOf('timeZone').map((z) => `<option value="${z}">`).join('');
+} catch {}
+
+(function init() {
+  let c = location.hash.slice(1);
+  if (!c) try { c = localStorage.getItem(STORE) || ''; } catch {}
+  let cfg = {};
+  if (c) try { cfg = JSON.parse(fromB64url(c)); } catch {}
+  load(cfg);
+  if (cfg.url) {
+    showLink();
+    refreshPreview();
+  }
+})();
+</script>
+</body>
+</html>
